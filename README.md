@@ -48,10 +48,10 @@ curl -X POST https://<api-id>.execute-api.eu-west-1.amazonaws.com/dev/upload \
 # Response:
 # { "uploadUrl": "https://s3...", "fileId": "abc-123", "s3Key": "projects/Alpha/pdf/report.pdf" }
 
-# 2. Upload the file directly to S3
+# 2. Upload the file directly to S3 (replace with the path to your local file)
 curl -X PUT "<uploadUrl from step 1>" \
   -H "Content-Type: application/pdf" \
-  --data-binary @report.pdf
+  --data-binary @/path/to/your/local/report.pdf
 ```
 
 ### Example: List Project Files
