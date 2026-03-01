@@ -1,0 +1,30 @@
+{
+  "name": "spacial-file-manager",
+  "version": "1.0.0",
+  "description": "Serverless file management service using AWS Lambda, API Gateway, DynamoDB, and S3",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "serverless deploy --stage dev",
+    "deploy:prod": "serverless deploy --stage prod",
+    "remove": "serverless remove --stage dev",
+    "invoke:upload": "serverless invoke local --function upload --data '{\"body\": \"{\\\"projectName\\\":\\\"Alpha\\\",\\\"fileType\\\":\\\"pdf\\\",\\\"fileName\\\":\\\"test.pdf\\\"}\"}'",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "aws",
+    "serverless",
+    "lambda",
+    "s3",
+    "dynamodb",
+    "file-management"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1000.0",
+    "@aws-sdk/client-s3": "^3.1000.0",
+    "@aws-sdk/lib-dynamodb": "^3.1000.0",
+    "@aws-sdk/s3-request-presigner": "^3.1000.0",
+    "uuid": "^13.0.0"
+  }
+}

@@ -1,0 +1,147 @@
+service: spacial-file-manager
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: eu-west-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    BUCKET_NAME: !Ref FilesBucket
+    TABLE_NAME: !Ref FilesTable
+    REGION: ${self:provider.region}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:HeadObject
+          Resource:
+            - !Sub "${FilesBucket.Arn}/*"
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:UpdateItem
+            - dynamodb:GetItem
+          Resource:
+            - !GetAtt FilesTable.Arn
+            - !Sub "${FilesTable.Arn}/index/*"
+
+functions:
+  upload:
+    handler: src/handlers/upload.handler
+    events:
+      - http:
+          path: upload
+          method: post
+          cors: true
+
+  sync:
+    handler: src/handlers/sync.handler
+    events:
+      - s3:
+          bucket: !Ref FilesBucket
+          event: s3:ObjectCreated:*
+          existing: true
+
+  getFiles:
+    handler: src/handlers/getFiles.handler
+    events:
+      - http:
+          path: projects/{projectName}/files
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                projectName: true
+              querystrings:
+                fileType: false
+
+  download:
+    handler: src/handlers/download.handler
+    events:
+      - http:
+          path: files/{fileId}/download
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                fileId: true
+              querystrings:
+                projectName: true
+
+  getFilesByType:
+    handler: src/handlers/getFilesByType.handler
+    events:
+      - http:
+          path: files
+          method: get
+          cors: true
+          request:
+            parameters:
+              querystrings:
+                fileType: true
+
+resources:
+  Resources:
+    FilesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: spacial-file-repo-${self:provider.stage}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - PUT
+                - GET
+                - HEAD
+              AllowedOrigins:
+                - '*'
+              MaxAge: 3600
+
+    FilesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: FilesTable-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: ProjectID
+            AttributeType: S
+          - AttributeName: FileID
+            AttributeType: S
+          - AttributeName: FileType
+            AttributeType: S
+          - AttributeName: UploadDate
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ProjectID
+            KeyType: HASH
+          - AttributeName: FileID
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: FileType-index
+            KeySchema:
+              - AttributeName: FileType
+                KeyType: HASH
+              - AttributeName: UploadDate
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+  Outputs:
+    ApiUrl:
+      Description: API Gateway endpoint URL
+      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}"
+    BucketName:
+      Description: S3 Bucket Name
+      Value: !Ref FilesBucket
+    TableName:
+      Description: DynamoDB Table Name
+      Value: !Ref FilesTable

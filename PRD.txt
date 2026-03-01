@@ -1,0 +1,71 @@
+this is my 1.5 hours home assigemnt :Assignment 2:
+Design an architecture diagram illustrating the use of AWS serverless technologies for the following purpose :
+● As a user I want to upload file/s that will be stored in a remote repository so I can download and review them later
+Take into consideration the following
+● Files are managed for multiple projects
+● Files are of different types
+● The user can request to download a specific file types
+The service should be built using a modern backend framework and deployed on AWS using serverless architecture or containerization.
+Assignment 3:
+Develop a code of backend side based on the results of Assignment 2
+Provide git repository link contains the source code and documentation
+
+i wrote this architecture fot this, please write a PRD and tell me what keys i need to provide:
+
+### Revised Component Architecture
+
+| Component | AWS Service | Purpose |
+| --- | --- | --- |
+| *API Layer* | *Amazon API Gateway* | Exposes RESTful endpoints (e.g., /files/upload, /projects/{id}/files). |
+| *Compute Layer* | *AWS Lambda* | Two functions: one for generating *S3 Presigned URLs* and one for *Querying DynamoDB*. |
+| *Metadata Store* | *Amazon DynamoDB* | Stores file info: ProjectID (PK), FileID (SK), FileType, S3Key, UploadDate. |
+| *Object Store* | *Amazon S3* | The physical repository for files. Organizes files using a prefix strategy: project-id/file-type/filename. |
+
+---
+
+### The Metadata Schema (DynamoDB)
+
+To handle *multiple projects* and *filtering by file type* efficiently, I recommend the following table structure:
+
+* *Partition Key (PK):* ProjectID (e.g., PROJ-101)
+* *Sort Key (SK):* FileID (e.g., UUID or Timestamp#FileName)
+* *Attributes:* FileType (e.g., pdf, png), S3Key, Status (Pending/Uploaded).
+* *Global Secondary Index (GSI):* Create an index on FileType so you can query "Give me all PDFs across all projects" or filter within a project.
+
+---
+
+### The "Presigned" Workflow (Simplified)
+
+1. *Request Upload:* User calls POST /upload with { "projectName": "Alpha", "fileType": "pdf", "fileName": "report.pdf" }.
+2. *Generate URL:* A Lambda function generates a *Presigned PUT URL*. It also writes a record to DynamoDB with Status: PENDING.
+3. *Direct Push:* The User's client (browser/Postman) sends the file directly to S3 using that URL. This avoids Lambda payload limits (6MB) and saves on execution costs.
+4. *S3 Trigger:* Once the file is safely in S3, an *S3 Event Notification* triggers a background Lambda to mark the DynamoDB record as UPLOADED.
+
+---
+
+### Visual Logic Flow
+
+mermaid
+graph TD
+    User[User/Client] -- 1. POST /upload --> AGW[API Gateway]
+    AGW -- 2. Invoke --> L1[Upload Lambda]
+    L1 -- 3. Create Record --> DDB[(DynamoDB)]
+    L1 -- 4. Get Presigned URL --> S3[(Amazon S3)]
+    L1 -- 5. Return URL --> User
+    
+    User -- 6. HTTP PUT File --> S3
+    S3 -- 7. On ObjectCreated --> L2[Sync Lambda]
+    L2 -- 8. Status: UPLOADED --> DDB
+    
+    User -- 9. GET /files?type=pdf --> AGW
+    AGW -- 10. Query GSI --> L3[Search Lambda]
+    L3 -- 11. Fetch Metadata --> DDB
+
+
+
+---
+
+### Key Technical Considerations
+
+* *S3 Prefixing:* Even though DynamoDB handles the search, organize your S3 bucket folders like this: s3://my-repository/projects/{project_id}/{file_type}/{file_name}. This makes manual review and lifecycle policies (like auto-deleting old logs) much easier.
+* *CORS:* Since the user will be uploading directly to S3 from a browser/app, you must enable *CORS (Cross-Origin Resource Sharing)* on the S3 bucket.
